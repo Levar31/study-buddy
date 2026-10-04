@@ -141,6 +141,8 @@ form.inline{display:flex;gap:10px} form.inline input{flex:1;min-width:0}
 .fr b:first-child{border-bottom:2px solid currentColor}
 .prob{font-family:var(--display);font-weight:800;font-size:clamp(26px,8vw,36px);line-height:1.25}
 .prob.word{font-family:var(--body);font-weight:600;font-size:20px}
+.vert{display:inline-grid;justify-items:end;font-variant-numeric:tabular-nums;letter-spacing:.08em;line-height:1.2}
+.vert .bot{border-bottom:3px solid currentColor;padding-left:.4em}
 details.sec{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:0}
 details.sec summary{list-style:none;cursor:pointer;padding:16px 18px;font-family:var(--display);font-weight:800;font-size:18px;display:flex;justify-content:space-between;align-items:center}
 details.sec summary::-webkit-details-marker{display:none}
@@ -211,7 +213,7 @@ const spellOut=w=>speak(w.split('').map(c=>c===' '?'space':c).join(', '),0.6);
 
 /* ---------------- state ---------------- */
 let state;
-const DEFAULT=()=>({v:1,settings:{name:'',pin:'',rate:0.85,showMath:true},
+const DEFAULT=()=>({v:1,settings:{name:'',pin:'',rate:0.85,showMath:true,mathSet:'g6'},
  week:{title:'Example week',example:true,started:todayKey(),
   spelling:[{w:'necessary',s:'It is necessary to study every day.'},{w:'separate',s:'Keep the red and blue marbles separate.'},{w:'believe',s:'I believe you can do it.'},{w:'receive',s:'Did you receive my letter?'},{w:'environment',s:'We should protect the environment.'},{w:'government',s:'The government makes laws.'},{w:'rhythm',s:'Clap to the rhythm of the song.'},{w:'definitely',s:'I will definitely be there.'}],
   vocab:[{w:'abundant',d:'more than enough; plentiful',e:'The garden had an abundant crop of tomatoes.'},{w:'diligent',d:'working carefully and steadily',e:'A diligent student checks every answer.'},{w:'reluctant',d:'not wanting to do something',e:'He was reluctant to jump into the cold pool.'},{w:'observe',d:'to watch carefully',e:'We observed the birds through binoculars.'},{w:'ancient',d:'very old; from long ago',e:'The ancient city was built of stone.'},{w:'summarize',d:'to tell the main points briefly',e:'Summarize the chapter in three sentences.'}],
@@ -268,7 +270,7 @@ routes['']=function home(){
    ${tile('#/verse','--verse',IC.cross,'Bible Verse',w.verse.text?esc(w.verse.ref||'This week\'s verse')+` · level ${state.progress.verseLevel} of 5`:'No verse yet',doneToday('verse'))}
   </div>
   ${state.subjects.length||st.showMath?'<h2>Subjects</h2>':''}
-  <div class="tiles">${subjTiles}${st.showMath?tile('#/math','--math',IC.calc,'Math Gym','Integers, equations, fractions and more',doneToday('math')):''}</div>
+  <div class="tiles">${subjTiles}${st.showMath?tile('#/math','--math',IC.calc,'Math Gym',st.mathSet==='g2'?'Addition facts and adding big numbers':'Integers, equations, fractions and more',doneToday('math')):''}</div>
   <p class="small muted center">A check mark means you practiced it today.</p>
   <a class="tile" href="#/parent" style="min-height:56px"><span class="ic" style="background:var(--muted)">${IC.lock}</span><span class="tx"><b>Parent mode</b><span>Add words, verses, subjects and worksheets</span></span>${IC.chev}</a>
  `);
@@ -578,18 +580,46 @@ const MATH={
    if(Math.random()<.5)return{q:`${n} ${b} = ? ${s}`,ans:n*k,steps:[`${b} are bigger, so multiply: ${n} × ${k} = ${n*k}`]};
    return{q:`${n*k} ${s} = ? ${b}`,ans:n,steps:[`${s} are smaller, so divide: ${n*k} ÷ ${k} = ${n}`]};}}
 };
+/* Grade 2 addition: facts to 20 with count on / make a ten / doubles / doubles plus one, then 2- and 3-digit with carrying */
+const vert=(a,b)=>`<span class="vert"><span>${a}</span><span class="bot">+ ${b}</span></span>`;
+const swap=(a,b)=>Math.random()<.5?[a,b]:[b,a];
+const ADD={
+ countOn(){const big=R(4,17),small=R(1,3),[x,y]=swap(big,small),seq=Array.from({length:small},(_,k)=>big+k+1).join(', ');
+  return{q:`${x} + ${y} =`,ans:big+small,tip:'Count on',steps:[`Start at the bigger number: ${big}.`,`Count up ${small}: ${seq}.`,`${x} + ${y} = ${big+small}`]};},
+ makeTen(){const a=R(7,9),b=R(11-a,9),need=10-a,[x,y]=swap(a,b);
+  return{q:`${x} + ${y} =`,ans:a+b,tip:'Make a ten',steps:[`${a} needs ${need} more to make 10.`,`Take ${need} from the ${b}. That leaves ${b-need}.`,`10 + ${b-need} = ${a+b}`]};},
+ doubles(){const a=R(1,10);return{q:`${a} + ${a} =`,ans:2*a,tip:'Doubles',steps:[`${a} + ${a} is a double.`,`${a} + ${a} = ${2*a}`]};},
+ near(){const a=R(2,9),[x,y]=swap(a,a+1);return{q:`${x} + ${y} =`,ans:2*a+1,tip:'Doubles plus one',steps:[`${a} and ${a+1} are next to each other.`,`Use the double: ${a} + ${a} = ${2*a}.`,`Add 1 more: ${2*a} + 1 = ${2*a+1}`]};},
+ big(digits){const lo=digits===2?10:100,hi=digits===2?89:899;const carry=Math.random()<.7;let a,b;
+  do{a=R(lo,hi);b=R(digits===2?10:lo,(digits===2?99:999)-a);}while(b<(digits===2?10:lo)||((a%10+b%10)>=10)!==carry);
+  const steps=[],names=['ones','tens','hundreds'];let c=0;
+  for(let p=0;p<digits;p++){const da=Math.floor(a/10**p)%10,db=Math.floor(b/10**p)%10,s=da+db+c;
+   steps.push(`${names[p][0].toUpperCase()+names[p].slice(1)}: ${da} + ${db}${c?' + 1 carried':''} = ${s}${s>=10&&p<digits-1?`. Write ${s%10}, carry the 1 to the ${names[p+1]}.`:''}`);c=s>=10?1:0;}
+  steps.push(`Answer: ${a+b}`);return{q:vert(a,b),ans:a+b,tip:carry?'Carrying':'Add each place',steps};}
+};
+const ADD_HELP={'Count on':'Start from the bigger number and count up. 9 + 2: say "10, 11."','Make a ten':'Move some from the smaller number to make 10, then add what is left. 7 + 5 = 10 + 2 = 12.','Doubles':'Same number twice. 8 + 8 = 16.','Doubles plus one':'Numbers next to each other: use the double, add 1. 8 + 9 = 16 + 1 = 17.','Carrying':'Add the ones first. If you get 10 or more, write the ones digit and carry the 1 to the tens.','Add each place':'Line up the places. Add the ones, then the tens, then the hundreds.'};
+const MATH2={
+ facts:{name:'Addition facts to 20',help:[ADD_HELP['Count on'],ADD_HELP['Make a ten'],ADD_HELP['Doubles'],ADD_HELP['Doubles plus one']],gen:()=>pick([ADD.countOn,ADD.makeTen,ADD.doubles,ADD.near])()},
+ counton:{name:'Count on',help:[ADD_HELP['Count on']],gen:ADD.countOn},
+ maketen:{name:'Make a ten',help:[ADD_HELP['Make a ten']],gen:ADD.makeTen},
+ doubles:{name:'Doubles and doubles plus one',help:[ADD_HELP['Doubles'],ADD_HELP['Doubles plus one']],gen:()=>pick([ADD.doubles,ADD.near])()},
+ add2:{name:'Adding 2-digit numbers',help:[ADD_HELP['Add each place'],ADD_HELP['Carrying']],gen:()=>ADD.big(2)},
+ add3:{name:'Adding 3-digit numbers',help:[ADD_HELP['Add each place'],ADD_HELP['Carrying']],gen:()=>ADD.big(3)}
+};
+const mathSet=()=>state.settings.mathSet==='g2'?MATH2:MATH;
 function parseNum(s){s=s.trim().replace(/[−–]/g,'-').replace(/[,$\s]/g,'').replace(/%$/,'');if(/^-?\d+\/\d+$/.test(s)){const [a,b]=s.split('/').map(Number);return b?a/b:NaN;}return s===''?NaN:Number(s);}
 routes.math=function(skill){
+ const MATH=mathSet();
  if(!skill||!MATH[skill])return screen('Math Gym','#/',`<p class="muted">Pick a skill. Every problem is new.</p><div class="tiles">${Object.entries(MATH).map(([k,m])=>{const it=state.progress.items['m:'+k];return `<a class="tile" href="#/math/${k}"><span class="ic" style="background:var(--math)">${IC.calc}</span><span class="tx"><b>${m.name}</b><span>${it?it.r+' of '+it.t+' right':'Not tried yet'}</span></span>${IC.chev}</a>`;}).join('')}</div>`);
  const M=MATH[skill];let P,answered=false,streakN=0,session=0;
  const show=()=>{P=M.gen();answered=false;screen(M.name,'#/math',`<div class="card"><div class="eyebrow">${streakN?'Streak '+streakN:'New problem'}</div><div class="prob">${P.q}</div>
   <form id="mf" class="inline"><input id="ti" class="answer" ${INPUT_ATTR} inputmode="text" placeholder="Answer"><button class="btn">Check</button></form><div id="fb"></div>
-  <button class="btn ghost small" data-act="hint">Show hint</button><div id="hint"></div></div><p class="small muted">Negatives: −5 or -5. Fractions: 3/5. Percents: 40.</p>`,a,()=>$('#ti').focus());};
+  <button class="btn ghost small" data-act="hint">Show hint</button><div id="hint"></div></div>${MATH===MATH2?'':'<p class="small muted">Negatives: −5 or -5. Fractions: 3/5. Percents: 40.</p>'}`,a,()=>$('#ti').focus());};
  const a={'submit:mf':()=>{if(answered)return show();const v=parseNum($('#ti').value);if(isNaN(v))return toast('Type a number, like 21, -8 or 3/5');answered=true;const ok=Math.abs(v-P.ans)<1e-6;rec('m:'+skill,ok);
    if(ok){streakN++;session++;if(session===5)markDone('math');}else streakN=0;
    $('#fb').innerHTML=ok?`<div class="fb ok"><b>Correct!</b> Press Check for the next one.</div>`:`<div class="fb no"><b>Not quite.</b> The answer is ${P.ans}.<ol>${P.steps.map(s=>'<li>'+s+'</li>').join('')}</ol></div>`;
    $('#mf button').textContent='Next';},
-  hint:()=>{const h=$('#hint');h.innerHTML=h.innerHTML?'':`<div class="hint"><b>Remember</b><ul>${M.help.map(x=>'<li>'+x+'</li>').join('')}</ul></div>`;}};
+  hint:()=>{const h=$('#hint');h.innerHTML=h.innerHTML?'':P.tip?`<div class="hint"><b>Try: ${P.tip}</b><ul><li>${ADD_HELP[P.tip]}</li></ul></div>`:`<div class="hint"><b>Remember</b><ul>${M.help.map(x=>'<li>'+x+'</li>').join('')}</ul></div>`;}};
  show();
 };
 
@@ -633,6 +663,7 @@ function parentHome(){
   <details class="sec"><summary>Settings</summary><div class="body"><form id="pset" class="body" style="padding:0">
    <label>Student's name<input id="nm" value="${esc(st.name)}" placeholder="First name"></label>
    <label>Reading voice speed<select id="rt">${[[0.7,'Slow'],[0.85,'Normal'],[1,'Quick']].map(([v,l])=>`<option value="${v}" ${+st.rate===v?'selected':''}>${l}</option>`).join('')}</select></label>
+   <label>Math Gym practice<select id="ms">${[['g2','Grade 2: addition facts and carrying'],['g6','Grade 6: integers, equations, fractions']].map(([v,l])=>`<option value="${v}" ${st.mathSet===v?'selected':''}>${l}</option>`).join('')}</select></label>
    <label>New parent PIN (leave blank to keep)<input id="np" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off"></label>
    <button class="btn">Save settings</button></form>
    <button class="btn ghost" data-act="testv">${IC.sound} Test the voice</button></div></details>
@@ -651,7 +682,7 @@ function parentHome(){
    state.week={title:'',started:todayKey(),spelling:[],vocab:[],verse:{ref:'',text:''}};state.progress.verseLevel=0;state.progress.verseTyped=0;save();toast('New week started. Enter the new lists.');parentHome();},
   'submit:ps':()=>{const n=$('#sn').value.trim();if(!n)return;const s={id:uid(),name:n,cards:[],worksheets:[]};state.subjects.push(s);save();location.hash='#/parent/subject/'+encodeURIComponent(s.id);},
   'change:sm':el=>{st.showMath=el.checked;save();},
-  'submit:pset':()=>{st.name=$('#nm').value.trim();st.rate=+$('#rt').value;const np=$('#np').value.trim();if(np){if(!/^\d{4,8}$/.test(np))return toast('PIN must be 4 to 8 digits.');st.pin=np;}save();toast('Settings saved');},
+  'submit:pset':()=>{st.name=$('#nm').value.trim();st.rate=+$('#rt').value;st.mathSet=$('#ms').value;const np=$('#np').value.trim();if(np){if(!/^\d{4,8}$/.test(np))return toast('PIN must be 4 to 8 digits.');st.pin=np;}save();toast('Settings saved');},
   testv:()=>speak('Hi '+(st.name||'there')+'. Spell the word: necessary.'),
   exp:()=>exportData(false),expall:()=>exportData(true),
   'change:imp':async el=>{const f=el.files[0];if(!f)return;try{await importData(f);}catch(e){toast(e.message);}el.value='';},
@@ -712,7 +743,15 @@ async function exportData(full){
 }
 async function importData(file){
  let data;try{data=JSON.parse(await file.text());}catch(e){throw new Error('That file is not a Study Buddy file.');}
- if(data.app!=='study-buddy'||!data.week||!Array.isArray(data.subjects))throw new Error('That file is not a Study Buddy file.');
+ if(data.app!=='study-buddy'||!Array.isArray(data.subjects)||(!data.week&&data.kind!=='subjects'))throw new Error('That file is not a Study Buddy file.');
+ if(data.kind==='subjects'){
+  if(!confirm('Add '+data.subjects.map(s=>'"'+s.name+'"').join(', ')+'? Spelling, vocabulary, the verse and other subjects stay the same.'))return;
+  toast('Loading…');
+  for(const [id,url] of Object.entries(data.blobs||{})){const b=await (await fetch(url)).blob();await idb.putBlob(id,b);}
+  for(const s of data.subjects){const k=state.subjects.findIndex(x=>x.id===s.id);if(k>=0)state.subjects[k]=s;else state.subjects.push(s);}
+  if(data.mathSet){state.settings.mathSet=data.mathSet;state.settings.showMath=true;}
+  save();await gc();toast('Added!');return parentHome();
+ }
  const isBackup=data.kind==='backup';
  if(!confirm(isBackup?'Load this full backup? It replaces everything in the app, including progress.':'Load this week? It replaces the current words, verse and subjects. Stars and streak are kept.'))return;
  toast('Loading…');
