@@ -625,13 +625,13 @@ function parentHome(){
    <div class="list">${state.subjects.map(s=>`<a class="li" href="#/parent/subject/${encodeURIComponent(s.id)}"><div class="grow"><b>${esc(s.name)}</b><div class="small muted">${s.cards.length} cards · ${s.worksheets.length} worksheets</div></div>${IC.chev}</a>`).join('')||'<p class="muted">No subjects yet.</p>'}</div>
    <form id="ps" class="inline"><input id="sn" placeholder="New subject, e.g. Math" ${INPUT_ATTR}><button class="btn">Add</button></form>
    <label class="check"><input type="checkbox" id="sm" ${st.showMath?'checked':''}> Show Math Gym (built-in math practice)</label></div></details>
-  <details class="sec"><summary>Send to his phone / backup</summary><div class="body">
-   <p class="help-text">Set things up on your own phone or computer, then tap <b>Share this week</b> and send the file to Luke's iPhone (AirDrop, Messages or email). On his phone, save the file to Files, then open Parent mode and tap <b>Load a file</b>.</p>
+  <details class="sec"><summary>Send to another device / backup</summary><div class="body">
+   <p class="help-text">Set things up on your own phone or computer, then tap <b>Share this week</b> and send the file to ${esc(st.name||'your child')}'s device (AirDrop, Messages or email). On that device, save the file to Files, then open Parent mode and tap <b>Load a file</b>.</p>
    <button class="btn" data-act="exp">Share this week (words, verse, subjects, worksheets)</button>
-   <button class="btn ghost" data-act="expall">Full backup (also includes his progress)</button>
+   <button class="btn ghost" data-act="expall">Full backup (also includes progress and stars)</button>
    <label class="btn ghost" for="imp" style="cursor:pointer">Load a file<input id="imp" type="file" accept=".json,application/json" hidden></label></div></details>
   <details class="sec"><summary>Settings</summary><div class="body"><form id="pset" class="body" style="padding:0">
-   <label>Student's name<input id="nm" value="${esc(st.name)}" placeholder="Luke"></label>
+   <label>Student's name<input id="nm" value="${esc(st.name)}" placeholder="First name"></label>
    <label>Reading voice speed<select id="rt">${[[0.7,'Slow'],[0.85,'Normal'],[1,'Quick']].map(([v,l])=>`<option value="${v}" ${+st.rate===v?'selected':''}>${l}</option>`).join('')}</select></label>
    <label>New parent PIN (leave blank to keep)<input id="np" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off"></label>
    <button class="btn">Save settings</button></form>
@@ -714,7 +714,7 @@ async function importData(file){
  let data;try{data=JSON.parse(await file.text());}catch(e){throw new Error('That file is not a Study Buddy file.');}
  if(data.app!=='study-buddy'||!data.week||!Array.isArray(data.subjects))throw new Error('That file is not a Study Buddy file.');
  const isBackup=data.kind==='backup';
- if(!confirm(isBackup?'Load this full backup? It replaces everything in the app, including progress.':'Load this week? It replaces the current words, verse and subjects. His stars and streak are kept.'))return;
+ if(!confirm(isBackup?'Load this full backup? It replaces everything in the app, including progress.':'Load this week? It replaces the current words, verse and subjects. Stars and streak are kept.'))return;
  toast('Loading…');
  for(const [id,url] of Object.entries(data.blobs||{})){const b=await (await fetch(url)).blob();await idb.putBlob(id,b);}
  if(!isBackup&&state.week.verse.text!==data.week.verse.text){state.progress.verseLevel=0;state.progress.verseTyped=0;}
